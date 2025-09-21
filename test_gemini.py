@@ -1,56 +1,65 @@
 import os
+import sys
 from geminiAPI import input_process
 from io import BytesIO
 
-def create_dummy_file(filename, content=None, file_type='text'):
-    """테스트를 위한 가상의 파일을 생성하는 헬퍼 함수입니다."""
-    file = BytesIO()
-    if file_type == 'text':
-        file.write(content.encode('utf-8'))
-    elif file_type == 'image':
-        # 실제 이미지 데이터가 필요할 경우 여기에 추가
-        pass
-    file.seek(0)
-    file.filename = filename
-    return file
-
-print("--- Gemini API 로컬 테스트 시작 ---")
-
-# 1. 텍스트 입력 테스트
-print("\n[1] 텍스트 입력 테스트 중...")
-text_input = "오늘 날씨는 맑음."
-test_data = [{'type': 'text', 'content': text_input}]
-result = input_process(test_data)
-print(f"결과: {result}")
-
-# 2. 이미지 파일 테스트 (더미 파일)
-print("\n[2] 이미지 파일 입력 테스트 중...")
-# 실제 이미지 파일 경로로 변경하여 테스트하세요.
-try:
-    with open("example.png", "rb") as f:
-        image_file = BytesIO(f.read())
-        image_file.filename = "example.png"
+# --- 헬퍼 함수 ---
+def create_file_from_path(file_path):
+    """실제 파일 경로를 기반으로 파일 객체를 생성합니다."""
+    if not os.path.exists(file_path):
+        return None
     
-    test_data = [{'type': 'file', 'file': image_file}]
-    result = input_process(test_data)
-    print(f"결과: {result}")
-except FileNotFoundError:
-    print("오류: example.png 파일을 찾을 수 없습니다. 테스트를 위해 실제 이미지 파일이 필요합니다.")
-    print("테스트를 위해 example.png 파일을 생성하거나 경로를 수정해주세요.")
+    with open(file_path, 'rb') as f:
+        file_content = BytesIO(f.read())
+        file_content.filename = os.path.basename(file_path)
+        return file_content
 
-# 3. PDF 파일 테스트 (더미 파일)
-print("\n[3] PDF 파일 입력 테스트 중...")
-# 실제 PDF 파일 경로로 변경하여 테스트하세요.
-try:
-    with open("example.pdf", "rb") as f:
-        pdf_file = BytesIO(f.read())
-        pdf_file.filename = "example.pdf"
-    
-    test_data = [{'type': 'file', 'file': pdf_file}]
-    result = input_process(test_data)
-    print(f"결과: {result}")
-except FileNotFoundError:
-    print("오류: example.pdf 파일을 찾을 수 없습니다. 테스트를 위해 실제 PDF 파일이 필요합니다.")
-    print("테스트를 위해 example.pdf 파일을 생성하거나 경로를 수정해주세요.")
+def main():
+    print("--- Gemini API CLI 테스트 ---")
+    print("1. 텍스트 입력")
+    print("2. 파일 입력 (경로 입력)")
+    print("3. 종료")
 
-print("\n--- 테스트 완료 ---")
+    while True:
+        choice = input("입력 방식을 선택하세요 (1, 2, 3): ")
+
+        if choice == '1':
+            text_input = input("텍스트를 입력하세요: ")
+            input_data = [{'type': 'text', 'content': text_input}]
+            result = input_process(input_data)
+            print("--- 결과 ---")
+            print(result)
+            print("------------\n")
+
+        elif choice == '2':
+            file_path = input("파일 경로를 입력하세요 (예: my_image.jpg): ")
+            file_object = create_file_from_path(file_path)
+            
+            if file_object:
+                input_data = [{'type': 'file', 'file': file_object}]
+                result = input_process(input_data)
+                print("--- 결과 ---")
+                print(result)
+                print("------------\n")
+            else:
+                print("오류: 파일을 찾을 수 없거나 올바른 파일 경로가 아닙니다.\n")
+        
+        elif choice == '3':
+            print("테스트를 종료합니다.")
+            sys.exit()
+
+        else:
+            print("잘못된 입력입니다. 1, 2, 3 중 하나를 입력하세요.\n")
+
+if __name__ == "__main__":
+    main()
+'''
+eof
+
+### 사용 방법
+
+1.  **`gemini_api.py`와 `test_gemini.py`가 같은 폴더에 있는지 확인**합니다.
+2.  **터미널에서 `test_gemini.py`를 실행**합니다.
+    ```bash
+    python test_gemini.py
+'''
