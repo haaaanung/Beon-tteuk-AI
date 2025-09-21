@@ -13,6 +13,9 @@ except ValueError as e:
     print(f"오류:{e}")
     exit()
 
+# 이전까지의 대화 저장
+chat_session = genai.GenerativeModel('gemini-2.5-flash').start_chat(history=[])
+
 def input_process(input_data):
     """
     text, image, pdf 등 다양한 유형의 입력을 받아 Gemini API에 전달하여 처리하는 함수.
@@ -24,7 +27,8 @@ def input_process(input_data):
     contents = []
     base_prompt = "입력 받은 자료에서 중요한 개념 및 키워드를 요약해줘. " \
     "시험에 나올 만한 핵심 내용은 **굵은 글씨**로 표시해서 정리해줘." \
-    "이 내용을 토대로 나중에 사용자가 질문하면 답해줘."
+    "이 내용을 토대로 나중에 사용자가 질문하면 답해줘." \
+    "서로 다른 주제일 경우 분류해줘야해."
 
 
     contents.append(base_prompt)
@@ -57,8 +61,7 @@ def input_process(input_data):
                     contents.append(text_content)
                 else:
                     return "지원하지 않는 형식의 파일입니다"
-        model = genai.GenerativeModel('gemini-2.5-flash')
-        response = model.generate_content(contents, stream=True)
+        response = chat_session.send_message(contents, stream=True)
         response.resolve()
 
         return response.text
