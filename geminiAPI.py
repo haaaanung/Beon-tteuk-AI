@@ -95,6 +95,9 @@ def input_process(input_data):
         response = chat_session.send_message(contents, stream=True)
         response.resolve()
 
+        # 현재 chat_session이 기억하고 있는 최신 기록을 통합 history에 반영
+        input_process.history = chat_session.history
+
         return response.text
     
     except genai.errors.ResourceExhaustedError:
