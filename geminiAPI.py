@@ -2,9 +2,10 @@ import google.generativeai as genai
 import fitz
 import os
 import time
-from google.genai.errors import ResourceExhaustedError, APIError 
 
 import key_manage
+
+num_of_keys = len(key_manage.api_keys) 
 
 def lock_and_retry(api_key, input_data):
     # 할당량 초과 시 키를 잠그고 재시도하는 로직을 분리하여 재귀 호출을 관리합니다.
@@ -33,7 +34,7 @@ def input_process(input_data):
         input_process.history = []
 
     # 사용 가능한 키 불러오기
-    api_key = key_manage.get_next_available_key()
+    api_key = key_manage.get_next_available_key(num_of_keys)
     
     if api_key is None: # 모든 API 키가 잠겼을 때
         soonest_time = key_manage.get_soonest_unlock_time()
@@ -96,11 +97,11 @@ def input_process(input_data):
 
         return response.text
     
-    except ResourceExhaustedError:
+    except genai.errors.ResourceExhaustedError:
         # 할당량 초과 시, 키를 잠그고 재시도하는 분리된 함수 호출
         return lock_and_retry(api_key, input_data)
 
-    except APIError as e:
+    except genai.errors.APIError as e:
         print(f"API 오류 발생 (키: {api_key[:4]}****): {e}")
         return f"API 요청 중 오류 발생: {e}"
 

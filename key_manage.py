@@ -27,7 +27,7 @@ if not api_keys:
 # 키의 초기값, 잠겨있지 않음
 key_status = {key: datetime(1970, 1, 1) for key in api_keys}
 
-currnet_key_index = 0
+current_key_index = 0
 
 # key별 대화 세션 저장을 위한 딕셔너리, geminiAPI.py와 공유
 chat_session = {}
