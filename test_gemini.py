@@ -9,8 +9,8 @@ def create_file_from_path(file_path):
     """실제 파일 경로를 기반으로 파일 객체를 생성합니다."""
     if not os.path.exists(file_path):
         return None
-
-    with open(file_path, "rb") as f:
+  
+    with open(file_path, 'rb') as f:
         file_content = BytesIO(f.read())
         file_content.filename = os.path.basename(file_path)
         return file_content
