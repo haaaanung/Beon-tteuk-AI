@@ -106,3 +106,19 @@ def get_soonest_unlock_time() -> datetime | None:
     else:
         # 잠긴 키가 하나도 없으면 None 반환
         return None
+    
+
+# 개별 키 잠금 시간 초기화 함수
+def reset_key(key: str):
+    key_status[key] = datetime(1970, 1, 1)
+    print(f"키 초기화: {key[:4]}**** 키의 잠금 상태를 해제했습니다.")
+
+
+# 모든 키, 인덱스 초기 상태로 되돌리는 함수 (테스트 용도)
+def reset_all_keys():
+    global current_key_index
+    for key in api_keys:
+        key_status[key] = datetime(1970, 1, 1)
+    
+    current_key_index = 0 
+    print("모든 API 키의 잠금 상태와 인덱스를 초기화했습니다.")
