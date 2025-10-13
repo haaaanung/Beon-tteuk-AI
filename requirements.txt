@@ -2,3 +2,4 @@ lightgbm
 google-generativeai
 python-dotenv
 PyMuPDF
+xgboost
