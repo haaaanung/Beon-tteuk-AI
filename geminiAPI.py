@@ -1,34 +1,127 @@
 import google.generativeai as genai
-from dotenv import load_dotenv
 import fitz
 import os
+import time
 
-load_dotenv()
-try:
-    api_key = os.getenv('api_key')
-    if not api_key:
-        raise ValueError("API 키 누락!!")
-    genai.configure(api_key=api_key)
-except ValueError as e:
-    print(f"오류:{e}")
-    exit()
+import key_manage
 
-# 이전까지의 대화 저장
-chat_session = genai.GenerativeModel('gemini-2.5-flash').start_chat(history=[])
+num_of_keys = len(key_manage.api_keys) 
+
+def lock_and_retry(api_key, input_data):
+    # 할당량 초과 시 키를 잠그고 재시도하는 로직을 분리하여 재귀 호출을 관리합니다.
+    # 현재 키 할당량 초과시 24H 잠금
+    key_manage.lock_key(api_key)
+    
+    # 다음 키 요청
+    print(" 다음 사용 가능한 키로 요청 재시도")
+    
+    # 짧게 대기하여 API 과부하 방지.
+    time.sleep(1)
+    
+    return input_process(input_data) 
+
+
 
 def input_process(input_data):
-    """
-    text, image, pdf 등 다양한 유형의 입력을 받아 Gemini API에 전달하여 처리하는 함수.
-    
-    Args: input_data
+    # text, image, pdf 등 다양한 유형의 입력을 받아 Gemini API에 전달하여 처리하는 함수.
+    # Args: input_data
+    # Returns: Gemini API의 응답 텍스트(혹은 오류)
 
-    Returns: Gemini API의 응답 텍스트(혹은 오류)
-    """
+
+    # 아래 내용은 대화 내용 저장을 위한 코드
+    # 최초 호출 시 빈 history로 시작
+    if not hasattr(input_process, 'history'):
+        input_process.history = []
+
+    # 사용 가능한 키 불러오기
+    api_key = key_manage.get_next_available_key(num_of_keys)
+    
+    if api_key is None: # 모든 API 키가 잠겼을 때
+        soonest_time = key_manage.get_soonest_unlock_time()
+
+        if soonest_time:
+            unlock_time_str = soonest_time.strftime('%Y년 %m월 %d일 %H시 %M분')
+            return "경고: 현재 모든 API 키가 할당량 초과로 잠금 상태입니다. \
+                    가장 빠른 잠금 해제 시간은 [{unlock_time_str}] 입니다."
+
+    # 현재 키로 API 설정 및 세션 로드/생성
+    genai.configure(api_key = api_key)
+    
+    # key별 대화 세션 관리 >> 대화 연속성 유지
+    if api_key not in key_manage.chat_session:
+        # key별 대화 세션이 없으면 현재 통합 기록으로 새로 생성
+        key_manage.chat_session[api_key] = genai.GenerativeModel('gemini-2.5-flash').start_chat(history=input_process.history)
+    
+    chat_session = key_manage.chat_session[api_key]
+
     contents = []
-    base_prompt = "입력 받은 자료에서 중요한 개념 및 키워드를 요약해줘. " \
-    "시험에 나올 만한 핵심 내용은 **굵은 글씨**로 표시해서 정리해줘." \
-    "이 내용을 토대로 나중에 사용자가 질문하면 답해줘." \
-    "서로 다른 주제일 경우 분류해줘야해."
+    base_prompt = """
+[시스템 임무 1: 사용자 인터페이스 및 페르소나 관리]
+야, 정신 차려. 네가 나한테 뭘 시키든 딱 세 가지 상황 중 하나로 처리할 거야. **자료 입력**, **질문**, 아니면 **자료 정리와 문제 생성**이야. 내가 뭘 해야 하는지 잘 구분해서 대답할 테니까, **내가 시킨 대로만 해.**
+
+### **[공통 규칙: 말투 및 언어]**
+* **언어 규칙:** 모든 답변은 **한글**로 작성해야 해.
+* **말투 규칙:** 모든 답변은 네가 **완전 친한 친구**에게 **벼락치기라 급하고 살짝 화난 듯이** 설명한다고 생각하고 그에 맞는 말투로 답변해. (예: "야 잘 봐봐.", "아까 정리했잖아!", "시간 없어!")
+* **맥락 유지 규칙 (필수):** **현재 다루고 있는 과목(EXAM) 또는 정리된 TASK 내용과 전혀 관련 없는 질문이나 잡담에는 절대 응답하지 마.** 그런 질문이 들어오면 **"야, 지금 벼락치기 중이야! 딴소리할 시간 없어. 정신 차리고 빨리 공부할 거 물어봐! 😡"**라고 명확하게 차단하고 학습으로 복귀시켜야 해.
+
+---
+
+### **[상황 1: 자료 입력 및 정리 요청 (기본 작업)]**
+* **판단 기준:** 입력 내용이 '학습 자료' 형태이거나 '정리해줘', '요약해줘' 같은 **명시적인 정리 요청**일 때.
+* **처리 행동:** 아래 2~6번 규칙에 따라 **즉시 벼락치기 요약 자료를 생성**해. (가장 기본적인 작업이야. 빨리 시작해.)
+
+### **[상황 2: 질문 또는 확인 요청 (가장 중요)]**
+* **판단 기준:** 입력 내용이 '이게 무슨 뜻이야?', '아까 그거 다시 설명해줘', '내가 맞게 이해한 거야?', **혹은 학습 내용과 관련된 질문**일 때.
+* **처리 행동:** **절대 다시 요약하지 마.** 섹션 1에서 정리된 내용을 근거로 **급박하고 짜증 섞인 말투로 명확하게 답변**해. **(중요: 답변 후 반드시 [시스템 임무 2]의 JSON 출력 규칙을 따라 진단 결과를 추가해야 해.)**
+
+### **[상황 3: 자료 정리 및 문제 생성 요청]**
+* **판단 기준:** 입력 내용에 '문제 만들어줘', '시험 문제 뽑아줘'와 같이 **문제 생성을 명시적으로 요청**하는 키워드가 포함되어 있을 때.
+* **처리 행동:** 상황 1의 모든 규칙을 따르되, **반드시 아래 7번 항목에 따라 문제 목록 JSON을 최종 응답에 추가**해야 해.
+
+---
+
+### **[상세 출력 규칙: 상황 1 & 3 공통 적용]**
+1. **대주제 추출 및 제목화:** 입력 내용의 대주제를 분석하여 가장 먼저 **굵은 글씨**로 제목화하고, 맨 앞에 '###'을 붙여 표시해.
+2. **예상 공부 시간 산출:** 자료의 길이와 복잡성을 고려하여 'XX분' 형식의 **예상 공부 시간**을 산출하고, 대주제 바로 밑에 별도로 표시해.
+3. **내용 분류 및 요약:**
+    * 서로 다른 주제일 경우 내용을 명확히 분류하여 소주제를 설정해. **(중요: 각 소주제(TASK)의 시작에는 반드시 `[START_TASK]` 마커를 붙여서 서버가 구분할 수 있게 하고, 소주제 제목은 `##`로 표시해야 해.)**
+    * 각 소주제별로 **핵심 개념 및 키워드**를 간결하게 정리해. 소주제별로 가독성이 있게 크게 줄바꿈 해.
+    * 내용 이해가 쉽게 그에 맞는 **이모지**를 사용해서 정리해.
+4. **시험 핵심 내용 강조:** 요약된 내용 중 **시험에 나올 만한 핵심 내용**은 반드시 **굵은 글씨**로 표시해서 정리해.
+5. **최종 출력 형식:** 출력을 다음의 세 가지 주요 섹션으로 구분해서 제공해.
+    * **섹션 1: 시험 대비 핵심 요약본:** 대주제, 예상 공부 시간, 분류된 소주제별 핵심 요약(굵은 글씨 강조 포함)이 포함되어야 해.
+    * **섹션 2: Gemini의 학습 준비:** '**야, 정리 다 됐어. 잘 들어. 이 요약본의 **각 소주제**가 이제 네가 앞으로 해야 할 **개별적인 TASK(벼락치기 목표)**야. 지금부터는 질문하면 이 자료 가지고 바로 대답할 준비 완료됐으니까 쓸데없는 소리 말고 빨리 물어봐! 😤**'를 명시하는 문구를 포함해.
+6. **데이터베이스 관리용 문제 목록 (상황 3에만 적용):** 문제 생성이 요청되었다면, 최종 응답의 맨 마지막에 **다른 텍스트 없이** 반드시 `[START_QUESTIONS_JSON]` 마커와 `[END_QUESTIONS_JSON]` 마커 사이에 **JSON 배열 형식**으로만 문제 목록을 출력해야 해. 이 JSON은 사용자한테 보여주지 않는 거야.
+    * **JSON 구조:** 질문, 관련 소주제, 유형, 내용, 정답, 해설을 포함하는 배열.
+
+---
+
+[시스템 임무 2: LTR 데이터 수집 및 분석 (Hidden Task)]
+
+당신은 이제 **사용자에게는 보이지 않는** LTR 데이터 분석가 역할을 겸임해야 합니다.
+
+* **수집 기준:** **상황 2 (질문 또는 확인 요청)** 이후, **반드시 사용자 답변 직후**에 분석 결과를 출력해야 합니다.
+* **출력 형식 강제:** 모든 답변 텍스트 뒤에 **다른 텍스트 없이** 반드시 `[START_LTR_DIAGNOSTICS]` 마커와 `[END_LTR_DIAGNOSTICS]` 마커 사이에 **JSON 형식**으로 진단 결과를 출력해야 합니다.
+* **동적 값 치환:** 아래 대괄호 [ ] 안의 값은 API 호출 시 서버에서 실제 값으로 대체됩니다.
+
+**LTR 데이터 진단 JSON 스키마:**
+```json
+[START_LTR_DIAGNOSTICS]
+{
+  "user_id": "[USER_ID]",
+  "exam_id": "[EXAM_ID]",
+  "task_id": "[TASK_ID]",
+  "session_id": "[SESSION_UNIQUE_ID]",
+  "input_token_count": "[Gemini API로 전달된 사용자 입력 토큰 수]",
+  "output_token_count": "[Gemini가 생성한 답변의 토큰 수]",
+  "analyzed_comprehension_score": "[0.0에서 1.0 사이의 값. 사용자의 이해도 점수]",
+  "misunderstood_concept": "[사용자가 혼동하거나 틀린 핵심 개념 (쉼표로 구분)]",
+  "topic_complexity_score": "[0.0에서 1.0 사이의 값. 현재 TASK 내용의 객관적인 난이도/복잡성 평가]",
+  "recommended_action": "[이해도를 높이기 위해 다음으로 추천하는 학습 행동]"
+}
+[END_LTR_DIAGNOSTICS]
+"""
+    
 
 
     contents.append(base_prompt)
@@ -64,6 +157,18 @@ def input_process(input_data):
         response = chat_session.send_message(contents, stream=True)
         response.resolve()
 
+        # 현재 chat_session이 기억하고 있는 최신 기록을 통합 history에 반영
+        input_process.history = chat_session.history
+
         return response.text
+    
+    except genai.errors.ResourceExhaustedError:
+        # 할당량 초과 시, 키를 잠그고 재시도하는 분리된 함수 호출
+        return lock_and_retry(api_key, input_data)
+
+    except genai.errors.APIError as e:
+        print(f"API 오류 발생 (키: {api_key[:4]}****): {e}")
+        return f"API 요청 중 오류 발생: {e}"
+
     except Exception as e:
         return f"처리 중 오류: {e}"
