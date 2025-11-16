@@ -1,6 +1,6 @@
 import os
 import sys
-from geminiAPI import get_base_prompt
+from geminiAPI import input_process
 from io import BytesIO
 
 
