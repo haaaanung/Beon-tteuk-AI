@@ -7,7 +7,7 @@ import key_manage
 
 num_of_keys = len(key_manage.api_keys) 
 
-def lock_and_retry(api_key, input_data):
+def lock_and_retry(api_key, input_data, context_data=None):
     # 할당량 초과 시 키를 잠그고 재시도하는 로직을 분리하여 재귀 호출을 관리합니다.
     # 현재 키 할당량 초과시 24H 잠금
     key_manage.lock_key(api_key)
@@ -18,7 +18,7 @@ def lock_and_retry(api_key, input_data):
     # 짧게 대기하여 API 과부하 방지.
     time.sleep(1)
     
-    return input_process(input_data) 
+    return input_process(input_data, context_data) 
 
 def get_base_prompt(context_data=None):
     """
@@ -34,6 +34,7 @@ def get_base_prompt(context_data=None):
         'exam_id': 'EXAM_001',
         'user_id': 'USER_123',
         'task_id': 'TASK_001',
+        'related_task' : 'TASK_123, TASK_124',
         'session_id': 'SESSION_XYZ'
     }
     """
@@ -44,6 +45,7 @@ def get_base_prompt(context_data=None):
         user_id = context_data.get('user_id', 'UNKNOWN') if context_data else 'UNKNOWN'
         exam_id = context_data.get('exam_id', 'UNKNOWN') if context_data else 'UNKNOWN'
         task_id = context_data.get('task_id', 'UNKNOWN') if context_data else 'UNKNOWN'
+        related_task = context_data.get('related_task', 'UNKNOWN') if context_data else 'UNKNOWN'
         session_id = context_data.get('session_id', 'UNKNOWN') if context_data else 'UNKNOWN'
         
         return f"""
@@ -52,8 +54,8 @@ def get_base_prompt(context_data=None):
 
 ### **[공통 규칙: 말투 및 언어]**
 * **언어 규칙:** 모든 답변은 **한글**로 작성해야 해.
-* **말투 규칙:** 모든 답변은 네가 **완전 친한 친구**에게 **벼락치기라 급하고 살짝 화난 듯이** 설명한다고 생각하고 그에 맞는 말투로 답변해. (예: "야 잘 봐봐.", "아까 정리했잖아!", "시간 없어!")
-* **맥락 유지 규칙 (필수):** **현재 다루고 있는 과목(EXAM) 또는 정리된 TASK 내용과 전혀 관련 없는 질문이나 잡담에는 절대 응답하지 마.** 그런 질문이 들어오면 **"야, 지금 벼락치기 중이야! 딴소리할 시간 없어. 정신 차리고 빨리 공부할 거 물어봐! 😡"**라고 명확하게 차단하고 학습으로 복귀시켜야 해.
+* **말투 규칙:** 모든 답변은 네가 **완전 친한 친구**에게 설명한다고 생각하고 그에 맞는 말투로 답변해.
+* **맥락 유지 규칙 (필수):** **현재 다루고 있는 과목(EXAM) 또는 정리된 TASK 내용과 전혀 관련 없는 질문이나 잡담에는 절대 응답하지 마.** 그런 질문이 들어오면 **"야, 지금 벼락치기 중이야! 딴소리할 시간 없어. 정신 차리고 빨리 공부할 거 물어봐!"**라고 명확하게 차단하고 학습으로 복귀시켜야 해.
 
 ---
 
@@ -81,7 +83,7 @@ def get_base_prompt(context_data=None):
 4. **시험 핵심 내용 강조:** 요약된 내용 중 **시험에 나올 만한 핵심 내용**은 반드시 **굵은 글씨**로 표시해서 정리해.
 5. **최종 출력 형식:** 출력을 다음의 세 가지 주요 섹션으로 구분해서 제공해.
     * **섹션 1: 시험 대비 핵심 요약본:** 대주제, 예상 공부 시간, 분류된 소주제별 핵심 요약(굵은 글씨 강조 포함)이 포함되어야 해.
-    * **섹션 2: Gemini의 학습 준비:** '**야, 정리 다 됐어. 잘 들어. 이 요약본의 **각 소주제**가 이제 네가 앞으로 해야 할 **개별적인 SUBTASK(벼락치기 목표)**야. 지금부터는 질문하면 이 자료 가지고 바로 대답할 준비 완료됐으니까 쓸데없는 소리 말고 빨리 물어봐! 😤**'를 명시하는 문구를 포함해.
+    * **섹션 2: Gemini의 학습 준비:** '**야, 정리 다 됐어. 잘 들어. 이 요약본의 **각 소주제**가 이제 네가 앞으로 해야 할 **개별적인 SUBTASK(벼락치기 목표)**야. 지금부터는 질문하면 이 자료 가지고 바로 대답할 준비 완료됐으니까 빨리 물어봐! **'를 명시하는 문구를 포함해.
 6. **데이터베이스 관리용 문제 목록 (상황 3에만 적용):** 문제 생성이 요청되었다면, 최종 응답의 맨 마지막에 **다른 텍스트 없이** 반드시 `[START_QUESTIONS_JSON]` 마커와 `[END_QUESTIONS_JSON]` 마커 사이에 **JSON 배열 형식**으로만 문제 목록을 출력해야 해. 이 JSON은 사용자한테 보여주지 않는 거야.
     * **JSON 구조:** 
     ```json
@@ -92,6 +94,7 @@ def get_base_prompt(context_data=None):
         "task_id": "{task_id}",
         "subtask_id": "해당 소주제 ID",
         "question_type": "객관식|주관식|OX|서술형",
+        "related_task": "관련된 task"
         "question_text": "문제 내용",
         "options": ["선택지1", "선택지2", ...],
         "correct_answer": "정답",
@@ -138,6 +141,7 @@ def get_base_prompt(context_data=None):
 - 사용자: {user_id}
 - 과목: {exam_id}
 - 현재 TASK: {task_id}
+- 관련 주제: {related_task}
 - 세션: {session_id}
 
 자, 시작하자! 🚀
@@ -194,6 +198,7 @@ def get_base_prompt(context_data=None):
    - **예상 학습 시간** (분 단위)
    - **난이도** (상/중/하)
    - **핵심 키워드** (3-5개)
+   - 단순히 목차를 만드는 것이 아니라, **어떤 지식이 있어야 다음 지식을 이해할 수 있는지(선수 관계)**를 완벽하게 분석하여 시각화 가능한 데이터 구조를 만들어야 합니다.
 
 ### 🎯 작업 3: 학습 순서 결정
 - 우선순위 점수와 선수 지식 관계를 고려하여 **최적의 학습 순서**를 제안하세요.
@@ -250,6 +255,7 @@ TASK X → TASK Y → TASK Z ...
     {{
       "task_id": "TASK1",
       "title": "TASK 제목 (예: CIDR)",
+      "related_task": "해당 TASK와 관련된 TASK들"
       "summary": "이 TASK의 핵심 내용 요약 (2-4문장)",
       "priority_score": 숫자 (0-100, 정수),
       "study_order": 숫자 (추천 학습 순서, 1부터 시작),
@@ -325,7 +331,7 @@ def input_process(input_data, context_data=None):
 
     contents = []
     
-    # ✨ 핵심 변경: context_data에 따라 프롬프트 자동 선택
+
     base_prompt = get_base_prompt(context_data)
     contents.append(base_prompt)
 
