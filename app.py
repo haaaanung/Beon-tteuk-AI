@@ -13,7 +13,7 @@ def add_subject():
         importance = request.form.get('importance')
         exam_date = request.form.get('date')
         description = request.form.get('description')
-        uploaded_file = request.files.get('file') # 파일 객체
+        uploaded_files = request.files.getlist('files') # 다중 파일 수신
 
         # 2. Gemini에게 넘길 Context 구성 (exam_init 모드)
         context_data = {
@@ -32,9 +32,10 @@ def add_subject():
         if description:
             input_data.append({'type': 'text', 'content': f"과목 설명: {description}"})
             
-        # 파일이 있다면 추가 (네 코드에서 file객체를 바로 읽을 수 있게 처리됨)
-        if uploaded_file:
-            input_data.append({'type': 'file', 'file': uploaded_file})
+        # 파일이 있다면 모두 추가
+        if uploaded_files:
+            for file in uploaded_files:
+                input_data.append({'type': 'file', 'file': file})
 
         # 4. 네가 만든 AI 로직 호출
         # 주의: 네 코드의 input_process가 (input_data, context_data)를 받도록 되어 있어야 해.
