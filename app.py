@@ -8,7 +8,7 @@ CORS(app)  # 리액트 등 외부 요청 허용
 # ---------------------------------------------------------
 # 1. 과목 추가 (초기 분석)
 # ---------------------------------------------------------
-@app.route('/api/add-subject', methods=['POST'])
+@app.route('/api/ai/add-subject', methods=['POST'])
 def add_subject():
     try:
         # 1. 리액트(FormData)에서 데이터 받기
@@ -57,7 +57,7 @@ def add_subject():
 # ---------------------------------------------------------
 # 2. 문제 생성 요청 (NEW)
 # ---------------------------------------------------------
-@app.route('/api/generate-questions', methods=['POST'])
+@app.route('/api/ai/generate-questions', methods=['POST'])
 def generate_questions():
     try:
         # 1. 리액트(JSON)에서 데이터 받기
@@ -65,7 +65,6 @@ def generate_questions():
         data = request.get_json()
         
         tag_name = data.get('tag_name')       # 필수: 공통 태그명 (예: OS_SCHEDULING)
-        summary = data.get('summary', '')     # 선택: 해당 태스크 요약 내용
         user_id = data.get('user_id', 'Guest')
 
         if not tag_name:

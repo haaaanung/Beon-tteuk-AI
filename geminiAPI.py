@@ -320,6 +320,7 @@ Task 1 → Task 3 → Task 2 → ...
   
   "tasks": [
     {{
+      "idx_n" : "task1", "task2",
       "tag_name": "공통_DB용_표준_영문_태그 (예: OS_SCHEDULING_CPU)",
       "title": "사용자용 한글 제목 (예: CPU 스케줄링 알고리즘)",
       "summary": "이 Task의 핵심 내용 (2-4문장)",
