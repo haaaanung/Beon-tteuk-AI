@@ -78,7 +78,11 @@ def generate_questions():
             'user_id': user_id,
             'related_tagname': tag_name, # 프롬프트의 {related_tagname}에 매핑됨
             'task_id': 'GEN_Q_TASK'
+<<<<<<< HEAD
+        }
+=======
         }   
+>>>>>>> upstream/main
 
         # 3. AI에게 보낼 '트리거 메시지' 구성
         # 프롬프트의 [상황 3] 판단 기준을 만족시키는 문구를 시스템이 대신 입력해줌
@@ -123,4 +127,8 @@ def generate_questions():
         return jsonify({"status": "error", "message": str(e)}), 500
 
 if __name__ == '__main__':
+<<<<<<< HEAD
     app.run(host='0.0.0.0', debug=True, port=5000)
+=======
+    app.run(host='0.0.0.0', debug=True, port=5000)
+>>>>>>> upstream/main
