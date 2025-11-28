@@ -189,7 +189,7 @@ def get_base_prompt(context_data=None):
 
 #### Step 1: Task 단위 분석 및 태그 생성
 1. 첨부된 자료를 분석하여 **3~8개의 독립적인 학습 단위(TASK)**로 분할하세요.
-2. **각 TASK마다** 공통 DB에서 사용될 **표준화된 영문 태그명(task_tag_name)**을 생성하세요.
+2. **각 TASK마다** 공통 DB에서 사용될 **표준화된 영문 태그명(tag_name)**을 생성하세요.
    - 형식: `[과목약어]_[주제명]_[세부개념]`
    - 예시: `OS_SCHEDULING_CPU`, `NETWORK_TCP_HANDSHAKE`, `DS_TREE_BINARY`
    - **중요**: 이 태그명은 전 세계 공통 식별자이므로 일관성과 직관성을 유지하세요.
@@ -197,7 +197,7 @@ def get_base_prompt(context_data=None):
 #### Step 2: 공통 DB Task 매칭 로직
 각 TASK에 대해 다음을 수행:
 ```
-IF (공통 DB에 해당 task_tag_name이 존재)
+IF (공통 DB에 해당 tag_name이 존재)
     → 기존 Task 참조 (task_id 재사용)
 ELSE
     → 새로운 Common Task 생성 필요 (신규 task_id 할당 예정)
@@ -227,13 +227,13 @@ ELSE
    - Task 제목은 간결하고 명확하게 (예: "CIDR 주소 체계", "CPU 스케줄링 알고리즘")
 
 2. **각 Task별 메타데이터 생성**
-   - `task_tag_name`: 공통 DB용 영문 표준 태그 (필수)
+   - `tag_name`: 공통 DB용 영문 표준 태그 (필수)
    - `title`: 사용자에게 보이는 한글 제목
    - `summary`: 핵심 내용 요약 (2-4문장)
    - `estimated_minutes`: 예상 학습 시간
    - `difficulty`: 상/중/하
    - `keywords`: 핵심 키워드 3-5개
-   - `prerequisite_tasks`: 선수 Task 태그명 목록 (다른 Task의 task_tag_name)
+   - `prerequisite_tasks`: 선수 Task 태그명 목록 (다른 Task의 tag_name)
 
 3. **Task 우선순위 절대점수 산정 (0~100점)**
    - 시험 출제 가능성 (40점)
@@ -320,7 +320,7 @@ Task 1 → Task 3 → Task 2 → ...
   
   "tasks": [
     {{
-      "task_tag_name": "공통_DB용_표준_영문_태그 (예: OS_SCHEDULING_CPU)",
+      "tag_name": "공통_DB용_표준_영문_태그 (예: OS_SCHEDULING_CPU)",
       "title": "사용자용 한글 제목 (예: CPU 스케줄링 알고리즘)",
       "summary": "이 Task의 핵심 내용 (2-4문장)",
       "priority_score": 숫자 (0-100),
@@ -328,7 +328,7 @@ Task 1 → Task 3 → Task 2 → ...
       "estimated_minutes": 숫자,
       "difficulty": "상|중|하",
       "keywords": ["키워드1", "키워드2", "키워드3"],
-      "prerequisite_tasks": ["선수_Task의_task_tag_name들 (없으면 빈 배열)"],
+      "prerequisite_tasks": ["선수Task의 tag_name들 (없으면 빈 배열)"],
       "suggested_common_subject": "이 Task가 속할 Common Subject 태그 (예: OPERATING_SYSTEMS)",
       "db_action": "use_existing|create_new",
       "scoring_breakdown": {{
@@ -340,12 +340,12 @@ Task 1 → Task 3 → Task 2 → ...
     }}
   ],
   
-  "recommended_sequence": ["task_tag_name1", "task_tag_name3", "task_tag_name2", ...],
+  "recommended_sequence": ["tag_name1", "tag_name3", "tag_name2", ...],
   
   "study_strategy": {{
-    "high_priority_tasks": ["90점 이상 task_tag_name 목록"],
-    "medium_priority_tasks": ["70-89점 task_tag_name 목록"],
-    "low_priority_tasks": ["70점 미만 task_tag_name 목록"],
+    "high_priority_tasks": ["90점 이상 tag_name 목록"],
+    "medium_priority_tasks": ["70-89점 tag_name 목록"],
+    "low_priority_tasks": ["70점 미만 tag_name 목록"],
     "estimated_total_hours": 숫자,
     "suggested_daily_hours": 숫자
   }}
@@ -358,11 +358,11 @@ Task 1 → Task 3 → Task 2 → ...
 🔍 최종 체크리스트
 
  파일 내용만 분석 (일반 지식 추가 금지)
- 각 Task에 유니크한 task_tag_name 할당
+ 각 Task에 유니크한 tag_name 할당
  Task → Subject 순서로 구조 결정
  JSON 마커 사이에 순수 JSON만 출력
  사용자용 텍스트에 태그명 노출 금지
- prerequisite_tasks는 다른 Task의 task_tag_name 참조
+ prerequisite_tasks는 다른 Task의 tag_name 참조
  db_integration_plan 섹션 필수 포함
 
 지금 바로 시작하세요! 🚀
